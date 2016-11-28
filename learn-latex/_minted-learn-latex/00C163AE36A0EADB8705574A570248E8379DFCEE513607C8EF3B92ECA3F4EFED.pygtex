@@ -1,0 +1,9 @@
+\begin{Verbatim}[commandchars=\\\{\}]
+\PYG{k+kd}{public} \PYG{k+kd}{class} \PYG{n+nc}{Helloworld}\PYG{o}{\PYGZob{}}
+	\PYG{k+kd}{public} \PYG{k+kd}{static} \PYG{k+kt}{void} \PYG{n+nf}{main}\PYG{o}{(} \PYG{n}{String}\PYG{o}{[]} \PYG{n}{args} \PYG{o}{)\PYGZob{}}
+		\PYG{n}{System}\PYG{o}{.}\PYG{n+na}{out}\PYG{o}{.}\PYG{n+na}{println}\PYG{o}{(} \PYG{l+s}{\PYGZdq{}Hello world\PYGZdq{}} \PYG{o}{);}
+
+		\PYG{n}{System}\PYG{o}{.}\PYG{n+na}{out}\PYG{o}{.}\PYG{n+na}{println}\PYG{o}{(} \PYG{l+s}{\PYGZdq{}世界, 你好\PYGZdq{}} \PYG{o}{);}
+	\PYG{o}{\PYGZcb{}}
+\PYG{o}{\PYGZcb{}}
+\end{Verbatim}

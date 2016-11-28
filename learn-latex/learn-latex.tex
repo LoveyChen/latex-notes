@@ -1,0 +1,36 @@
+%!
+\documentclass[UTF8]{ctexart}
+
+%\usepackage{listings}
+
+\usepackage{minted}
+
+
+
+\begin{document}
+
+\section{A bit about Logging}
+
+\begin{enumerate}
+	\item A log is an append-only, totally-ordered sequence of records ordered by time.
+	\item A record in log records when and where and what happens.
+\end{enumerate}
+
+
+%\lstset{language=Python}
+	%# python source code goes here
+
+%This is an inline source code example \lstinline[language=Pascal]|var i:integer;| which declared a variable i.
+
+
+\begin{minted}[linenos]{java}
+
+public class Helloworld{
+	public static void main( String[] args ){
+		System.out.println( "Hello world" );
+		
+		System.out.println( "世界, 你好" );
+	}
+}
+\end{minted}
+\end{document}
