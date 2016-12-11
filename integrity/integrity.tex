@@ -1,6 +1,7 @@
 % 运营商抓取完整性 和 增量抓取服务 文档
 \documentclass[UTF8]{ctexart}
 
+\usepackage{underscore}
 \usepackage{minted}
 
 
@@ -54,14 +55,14 @@
 
 该表需要说明两点:
 \begin{enumerate}
-	\item session id. 当前的抓取框架还没有发展出 session id, 因此目前使用 uid 代替 session id. 注意到,
+	\item session_id. 当前的抓取框架还没有发展出 session id, 因此目前使用 uid 代替 session id. 注意到,
 使用 session id 可以记录每个 session 的抓取完整性数据. 但是每个抓取 session 的 uid 时相同的, 因此当前
 的 uid 并不能代替 session ID 的功能, uid 只是 session ID 的占位符
 
-	\item total records. 该表使用了 total records 和 crawled records 两个字段来记录抓取的空间完整性. 
-其中 crawled records 用于记录用户实际抓取到的记录数, total records 用于记录运营商返回的该用户的总记录数.
-然而并非所有运营商都会返回该数据, 此时默认 total records = crawled records. 当前各运营商并没有抓取运营商
-总记录数, 因此当前总是 total records = crawled records. 我们会在后面的抓取中对此进行改进.
+	\item total_records. 该表使用了 total_records 和 crawled_records 两个字段来记录抓取的空间完整性. 
+其中 crawled records 用于记录用户实际抓取到的记录数, total_records 用于记录运营商返回的该用户的总记录数.
+然而并非所有运营商都会返回该数据, 此时默认 total_records = crawled_records. 当前各运营商并没有抓取运营商
+总记录数, 因此当前总是 total_records = crawled_records. 我们会在后面的抓取中对此进行改进.
 \end{enumerate}
 
 
@@ -73,10 +74,16 @@
 
 差集抓取的核心在于抓取完整性的判断. 当前的抓取服务尚难以精确判断一个月抓取数据是否完整. 因此当前采用如下规则进行判断:
 \begin{enumerate}
-	\item 该月通话记录为 0, 则该月抓取不完整, 需重新抓取;
-	\item 该月 total racords != crawled records, 则该月抓取不完整, 需重新抓取;
-	\item 当前月数据默认总是不完整, 需要重新抓取;
-	\item 用户显式指定不强制更新当前月时, 可以不每次重新抓取当前要详单. 该规则适用于每个月详单均需要短信验证码的运营商.
+	\item 该月通话记录为 0, 则该月抓取不完整, 需重新抓取
+	\item 该月 total_racords != crawled_records, 则该月抓取不完整, 需重新抓取
+	\item 当前月数据默认总是不完整, 需要重新抓取
+	\item 用户显式指定不强制更新当前月时, 可以不每次重新抓取当前要详单. 该规则适用于每个月详单均需要短信验证码的运营商
+	\item 该月 total_records 为整百, 则该数据较为可以, 可根据情况决定是否重新抓取
 \end{enumerate}
+
+为了避免频繁读取完整性数据库, 在应用中使用 redis 缓存用户完整性数据. 使用缓存时, 数据一致性是不得不考虑的问题. 一旦抓取服务抓取了新的
+账单或详单数据时, 就需要对缓存进行更新. 当前的缓存更新策略是, 一旦有新的抓取发生时, 就将该数据从缓存中删除. 因此一次抓取可能会两次读库,
+一次是抓取账单时读取完整性数据; 第二次是抓取详单时, 该用户缓存已被删除, 则会重新读取数据库中的完整性信息(当抓取详单时, 该缓存尚未删除, 
+则不用再次读库). 
 
 \end{document}
