@@ -1,4 +1,5 @@
-! *.tex
-! *.pdf
-! */*.tex
-! */*.pdf
+!.gitignore
+! /*/*.tex
+! /*/*.pdf
+
+/*
