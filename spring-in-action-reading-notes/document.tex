@@ -1,0 +1,222 @@
+% Spring in action, 4th edition, reading notes
+
+\documentclass[UTF8, heading=true, scheme=chinese]{ctexart}
+
+\usepackage{underscore}
+\usepackage{minted}
+\usepackage{hyperref}
+
+\usepackage{float}
+\floatstyle{boxed}
+\restylefloat{figure}
+
+\title{Spring in action, 4th edition 读书笔记}
+\author{陈雕}
+
+\begin{document}
+\maketitle
+\newpage
+
+\tableofcontents
+\newpage
+
+
+\section[Advanced wiring]{Advanced wiring}
+本章介绍了 wiring 的一些高级技巧, 包括:
+\begin{enumerate}
+	\item[\nameref{sec:profiles}] 主要介绍了 profiles 的使用, 包括如何定义 profiled beans 以及 如何在应用中启用相应的 profile
+	\item[\nameref{sec:conditional}] 主要介绍了 @Conditional 注解, 以及如何定义和使用 Conditional beans
+	\item[\nameref{sec:qualifiers}] 主要介绍了 autowiring 时多个beans满足注入条件时的处理办法
+	\item[\nameref{sec:scope}] 介绍了Spring中 beans 的 scope 的概念, 以及设置 beans 的scope的条件和方法
+	\item[\nameref{sec:runtime}] 主要介绍了如何在定义 beans 使用外部值(如属性文件中定义的值) 以及更为通用的 Spring Expression Language (SpEL)
+\end{enumerate}
+
+
+\subsection[Environment and Profiles]{Environment and Profiles} \label{sec:profiles}
+一个应用, 从开发到测试到部署, 通常会在不同的环境中运行, 而不同环境可能有不同的应用配置, 如开发/测试和运行环境的数据库配置可能就各部相同.
+一个可能的解决办法是分别为各个环境写不同的配置文件, 在不同环境下面, 使用各自的配置文件替换应用的配置文件即可.
+
+然而, 一旦 Spring 的配置文件发生改变(无论是隐式配置还是显示的Java或XML配置), 就涉及到应用的重新构建和部署, 也就带来QA或OP在应用中引入bug的风险.
+一种更好的方式是使用 Spring 的 profile.
+
+Profile 由 Spring 3.1 引入. 主要使用方法是 使用 @Profile 注解(Java配置时) 或 使用 beans 标记的 profile 属性.
+\begin{minted}[breaklines=true, showspaces=false, showtabs=false]{java}
+@Configuration
+public class DataSourceConfig {
+
+	@Bean(destroyMethod="shutdown")
+	@Profile("dev")
+	public DataSource embeddedDataSource() {
+		return new EmbeddedDatabaseBuilder()
+		.setType(EmbeddedDatabaseType.H2)
+		.addScript("classpath:schema.sql")
+		.addScript("classpath:test-data.sql")
+		.build();
+	}
+		
+	@Bean
+	@Profile("prod")
+	public DataSource jndiDataSource() {
+		JndiObjectFactoryBean jndiObjectFactoryBean =
+		new JndiObjectFactoryBean();
+		jndiObjectFactoryBean.setJndiName("jdbc/myDS");
+		jndiObjectFactoryBean.setResourceRef(true);
+		jndiObjectFactoryBean.setProxyInterface(javax.sql.DataSource.class);
+		return (DataSource) jndiObjectFactoryBean.getObject();
+	}
+}
+\end{minted}
+
+
+\begin{minted}[breaklines=true, showspaces=false, showtabs=false]{xml}
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+			xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+			xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+			xsi:schemaLocation="
+			http://www.springframework.org/schema/jdbc
+			http://www.springframework.org/schema/jdbc/spring-jdbc.xsd
+			http://www.springframework.org/schema/beans
+			http://www.springframework.org/schema/beans/spring-beans.xsd"
+			profile="dev">
+			
+	<jdbc:embedded-database id="dataSource">
+		<jdbc:script location="classpath:schema.sql" />
+		<jdbc:script location="classpath:test-data.sql" />
+	</jdbc:embedded-database>
+</beans>
+\end{minted}
+
+如何启用对应的 profile 呢? 主要依靠两个属性 \mintinline{java}|spring.profiles.active| 和 \mintinline{java}|spring.profiles.active|, 其中前者具有更高的优先级.
+那么应用如何设置这两个参数呢? 主要可以有如下几种方法:
+\begin{itemize}
+	\item 设置为 DispatcherServlet 的初始化参数, 参考 web.xml 的相关说明
+	\item 设置为 web 应用的上下文参数, 参考 web.xml 的相关说明
+	\item 设置为 JNDI 条目
+	\item 设置为环境变量
+	\item 设置为 JVM 系统参数
+	\item 给集成测试类添加 @ActiveProfiles 注解, 制定对应的 profile
+\end{itemize}
+
+
+
+
+
+
+\subsection[Conditional beans]{Conditional beans} \label{sec:conditional}
+事实上, \nameref{sec:profiles} 可以看做时 \nameref{sec:conditional} 的特例. Conditional beans 主要用于在系统满足一定条件时才创建对应的 beans. 
+Conditional beans 主要靠 @Conditional 注解 和 @Conditional 制定的规则类来实现,  如
+\begin{minted}[breaklines=true]{java}
+@Bean
+@Conditional(MagicExistsCondition.class)
+public MagicBean magicBean() {
+	return new MagicBean();
+}
+\end{minted}
+
+其中, @Conditional 的参数是接口 @Condition 接口的实现类.
+\begin{minted}[breaklines=true]{java}
+public interface Condition {
+	boolean matches(ConditionContext ctxt, AnnotatedTypeMetadata metadata);
+}
+\end{minted}
+当指定的 @Condition 实现类的 matches 返回 true, 则会创建对应的 beans.
+
+
+
+\subsection[Primary and Qualifiers]{Primary and Qualifiers} \label{sec:qualifiers}
+@Primary 和 @Qualifier 用于解决多个bean都满足注入条件时的歧义问题. 当不使用 @Primary 或 @Qualify  时,
+如果有多个bean同时满足注入条件, 则Spring会抛出 \mintinline{java}|org.springframework.beans.factory.NoUniqueBeanDefinitionException|.
+
+此时可以使用 @Primary 注解, 该注解可以在定义有歧义bean的类签名处使用, 也可以在配置时使用. XML配置文件中则使用 beans 的 primary="true" 属性.
+\begin{minted}[breaklines=true]{java}
+@Component
+@Primary
+public class IceCream implements Dessert { ... }
+\end{minted}
+
+\begin{minted}[breaklines=true]{java}
+@Bean
+@Primary
+public Dessert iceCream() {
+	return new IceCream();
+}
+\end{minted}
+
+显然, 如果多个有歧义的bean同时设置了 @Primary 注解, 则不能有效解决歧义问题. 此时可以使用 qualifier. @Qualifier 注解主要是beans 注入时使用, 即在Autowired注解处使用.
+\begin{minted}[breaklines=true]{java}
+@Autowired
+@Qualifier("iceCream")
+public void setDessert(Dessert dessert) {
+	this.dessert = dessert;
+}
+\end{minted}
+
+
+
+
+\subsection[Scope beans]{Scope beans} \label{sec:scope}
+默认情况下, beans 被创建为单例模式( Singleton), 即无论一个制定ID的bean被注入到其它beans中时, 注入的总是同一个bean. 
+
+当Singleton不能满足条件时, 还可以指定beans的Scope, Spring定义了如下几种Scope:
+\begin{enumerate}
+	\item[Singleton] bean被创建为单例模式, 即每次都是同一个bean
+	\item[Prototype] 每次注入bean, 都创建一个全新的bean
+	\item[Session] 同一个会话中注入的bean总是同一个bean(Web Application) 
+	\item[Request] 同一个请求中注入的bean总是同一个bean (Web Application)
+\end{enumerate}
+
+对于前两种Scope, 可以在配置Beans使用@Scope指定bean的Scope, 如
+\begin{minted}[breaklines=true]{java}
+@Bean
+@Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
+public Notepad notepad() {
+	return new Notepad();
+}
+\end{minted}
+
+而在Web Application中, 则应使用如下方式指定bean的Scope,
+\begin{minted}[breaklines=true]{java}
+@Component
+@Scope(
+	value=WebApplicationContext.SCOPE_SESSION,
+	proxyMode=ScopedProxyMode.INTERFACES)
+public ShoppingCart cart() { ... }
+\end{minted}
+
+注意Scope的proxyMode属性. 
+
+
+
+
+\subsection[Scope beans]{Runtime value injection} \label{sec:runtime}
+可以在指定bean属性时, 引用外部变量,  如下:
+\begin{minted}[breaklines=true]{java}
+@Configuration
+@PropertySource("classpath:/com/soundsystem/app.properties")
+public class ExpressiveConfig {
+	@Autowired
+	Environment env;
+	@Bean
+	public BlankDisc disc() {
+		return new BlankDisc(
+		env.getProperty("disc.title"),
+		env.getProperty("disc.artist"));
+	}
+}
+\end{minted}
+
+而使用 Spring Expression Language (SpEL)则具有更好的灵活性.
+SpEL的形式是 \#\{...\}, 其表达式可以是
+\begin{enumerate}
+	\item[字面常量, literal value]	如 \#\{3.14159\}, \#\{'Hello World'\}
+	\item[bean, 及其属性或方法]	如 \#\{sgtPeppers\}, \#\{sgtPeppers.artist\}, \#\{sgtPeppers.artist?.toUpperCase()\}
+	\item[类的静态成员或方法]	如 \#\{T(java.lang.Math).PI\}, \#\{T(java.lang.Math).random()\}
+	\item[算式] 	如 \#\{2 * T(java.lang.Math).PI * circle.radius\}
+	\item[正则表达式]	如 \#\{admin.email matches '[a-zA-Z0-9._\%+-]+@[a-zA-Z0-9.-]+\\.com'\}, 结果是 true 或 false
+	\item[集合表达式]	如 \#\{jukebox.songs[4].title\}, \#\{jukebox.songs.?[artist eq 'Aerosmith']\},  \#\{jukebox.songs.\^[artist eq 'Aerosmith']\}, \#\{jukebox.songs.![title]\}
+\end{enumerate}
+
+注意bean属性中的 ?. 运算符, \#\{sgtPeppers.artist?.toUpperCase()\}, 当 sgtPeppers.artist 为 null, 直接返回 null, 而不用执行 toUpperCase 了, 类似的有集合表达式中 .?[] 操作符.
+集合表达式的 .\^[] 和 .![] 则分别取满足条件的第一个和最后一个元素. 
+\end{document}
